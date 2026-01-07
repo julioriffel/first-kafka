@@ -22,3 +22,4 @@ All notable changes to this project will be documented in this file.
     - Reduced I/O overhead via throttled polling and streamlined logging.
 - Added project shortcuts via `uv` and `taskipy` for producer, consumer, and infrastructure management.
 - Configured `pre-commit` with `ruff` and `pytest` integration.
+- Added GitHub Actions CI pipeline for automated testing and linting.

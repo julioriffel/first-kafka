@@ -1,5 +1,7 @@
 # Kafka High-Performance Micro-Infrastructure
 
+[![CI](https://github.com/julioriffel/first-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/julioriffel/first-kafka/actions/workflows/ci.yml)
+
 A robust, performant Kafka producer-consumer application leveraging **Confluent Platform 8.0.3 (Apache Kafka 4.0)** in **KRaft mode**. This project is designed for massive horizontal scaling with automated partition management and persistent storage.
 
 ## ✨ Key Features
