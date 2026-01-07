@@ -8,32 +8,65 @@ def test_consumer_initialization():
     consumer = KafkaMessageConsumer(consumer_impl=mock_kafka_impl)
     assert consumer.consumer == mock_kafka_impl
     mock_kafka_impl.subscribe.assert_called_once()
+    assert consumer.retry_producer is not None
 
 
 @patch("src.consumer.Consumer")
-def test_consumer_default_initialization(mock_consumer_cls):
+@patch("src.consumer.KafkaMessageProducer")
+def test_consumer_default_initialization(mock_producer_cls, mock_consumer_cls):
     """Test initialization without passing a consumer implementation."""
     consumer = KafkaMessageConsumer()
     mock_consumer_cls.assert_called_once()
+    mock_producer_cls.assert_called_once()
     assert consumer.consumer == mock_consumer_cls.return_value
+    assert consumer.retry_producer == mock_producer_cls.return_value
     consumer.consumer.subscribe.assert_called_once()
 
 
-def test_consume_batch_success():
+@patch("random.randint")
+def test_consume_batch_success_lucky_7(mock_randint):
+    mock_randint.return_value = 7  # Force success
     mock_kafka_impl = MagicMock()
     mock_msg = MagicMock()
     mock_msg.error.return_value = None
     mock_msg.value.return_value = b'{"hello": "world"}'
     mock_msg.partition.return_value = 5
 
-    # Return one message
     mock_kafka_impl.consume.return_value = [mock_msg]
 
-    consumer = KafkaMessageConsumer(consumer_impl=mock_kafka_impl)
+    consumer = KafkaMessageConsumer(
+        consumer_impl=mock_kafka_impl, producer_impl=MagicMock()
+    )
     messages = consumer.consume_batch(batch_size=1, timeout=0.1)
 
     assert len(messages) == 1
     assert messages[0] == {"hello": "world"}
+    consumer.retry_producer.send_message.assert_not_called()
+
+
+@patch("random.randint")
+def test_consume_batch_retry_unlucky(mock_randint):
+    mock_randint.return_value = 2  # Not 7, retry
+    mock_kafka_impl = MagicMock()
+    mock_msg = MagicMock()
+    mock_msg.error.return_value = None
+    mock_msg.value.return_value = b'{"hello": "world", "retry_count": 0}'
+    mock_msg.partition.return_value = 5
+
+    mock_kafka_impl.consume.return_value = [mock_msg]
+    mock_producer = MagicMock()
+
+    consumer = KafkaMessageConsumer(
+        consumer_impl=mock_kafka_impl, producer_impl=mock_producer
+    )
+    messages = consumer.consume_batch(batch_size=1, timeout=0.1)
+
+    # Logic: if not 7, we handle it by producing, but we don't return it as 'processed' (success)
+    assert len(messages) == 0
+    mock_producer.send_message.assert_called_once()
+    call_args = mock_producer.send_message.call_args
+    assert call_args[0][1]["retry_count"] == 1  # Incremented
+    assert call_args[0][1]["hello"] == "world"
 
 
 def test_consume_batch_empty():
@@ -53,18 +86,11 @@ def test_consume_batch_with_error():
     mock_err.code.return_value = KafkaError.UNKNOWN_TOPIC_OR_PART  # Some error
     mock_msg_error.error.return_value = mock_err
 
-    mock_msg_success = MagicMock()
-    mock_msg_success.error.return_value = None
-    mock_msg_success.value.return_value = b'{"valid": "data"}'
-    mock_msg_success.partition.return_value = 0
-
-    mock_kafka_impl.consume.return_value = [mock_msg_error, mock_msg_success]
-
+    mock_kafka_impl.consume.return_value = [mock_msg_error]
     consumer = KafkaMessageConsumer(consumer_impl=mock_kafka_impl)
     messages = consumer.consume_batch()
-
-    assert len(messages) == 1
-    assert messages[0] == {"valid": "data"}
+    # Error should be skipped
+    assert len(messages) == 0
 
 
 def test_consume_batch_partition_eof():
@@ -99,7 +125,10 @@ def test_consume_batch_decode_error():
 def test_start_consuming_loop():
     """Test start_consuming by mocking consume_batch to raise KeyboardInterrupt immediately."""
     mock_kafka_impl = MagicMock()
-    consumer = KafkaMessageConsumer(consumer_impl=mock_kafka_impl)
+    mock_producer = MagicMock()
+    consumer = KafkaMessageConsumer(
+        consumer_impl=mock_kafka_impl, producer_impl=mock_producer
+    )
 
     # Side effect: first call raises KeyboardInterrupt
     consumer.consume_batch = MagicMock(side_effect=KeyboardInterrupt)
@@ -108,6 +137,7 @@ def test_start_consuming_loop():
 
     consumer.consume_batch.assert_called_once()
     mock_kafka_impl.close.assert_called_once()
+    mock_producer.close.assert_called_once()
 
 
 def test_start_consuming_exception():

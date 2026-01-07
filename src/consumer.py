@@ -1,10 +1,12 @@
 import json
+import random
 from confluent_kafka import Consumer, KafkaError
 from src.config import settings
+from src.producer import KafkaMessageProducer
 
 
 class KafkaMessageConsumer:
-    def __init__(self, consumer_impl=None):
+    def __init__(self, consumer_impl=None, producer_impl=None):
         if consumer_impl:
             self.consumer = consumer_impl
         else:
@@ -16,6 +18,11 @@ class KafkaMessageConsumer:
                 "fetch.wait.max.ms": 500,  # Or wait 500ms
             }
             self.consumer = Consumer(conf)
+
+        if producer_impl:
+            self.retry_producer = producer_impl
+        else:
+            self.retry_producer = KafkaMessageProducer()
 
         self.consumer.subscribe([settings.KAFKA_TOPIC])
 
@@ -36,17 +43,35 @@ class KafkaMessageConsumer:
 
             try:
                 # Direct bytes-to-dict deserialization avoids intermediate string allocation (approx 30% faster)
-                processed_messages.append(json.loads(msg.value()))
-                partitions_seen.add(msg.partition())
+                data = json.loads(msg.value())
+
+                # Random retry logic
+                rand_val = random.randint(0, 10)
+
+                if rand_val == 7:
+                    retry_count = data.get("retry_count", 0)
+                    print(
+                        f"[{settings.KAFKA_GROUP_ID}] LUCKY 7! Processed after {retry_count} retries. Msg: {data}"
+                    )
+                    processed_messages.append(data)
+                    partitions_seen.add(msg.partition())
+                else:
+                    # Increment retry count and send back to queue
+                    data["retry_count"] = data.get("retry_count", 0) + 1
+                    # print(f"Retry {rand_val}!=7. Re-queueing. Count: {data['retry_count']}")
+                    self.retry_producer.send_message(
+                        settings.KAFKA_TOPIC, data, poll=False
+                    )
+                    # We accept that this message is 'handled' by being re-queued, so we don't treat it as an error
+
             except Exception as e:
-                print(f"Error decoding message: {e}")
+                print(f"Error decoding or processing message: {e}")
 
         if processed_messages:
             p_ids = ", ".join(map(str, sorted(partitions_seen)))
             print(
-                f"[{settings.KAFKA_GROUP_ID}] Processed {len(processed_messages)} msgs from partition(s): {p_ids}"
+                f"[{settings.KAFKA_GROUP_ID}] Batch Summary: {len(processed_messages)} successes from partition(s): {p_ids}"
             )
-            print(f"  Sample: {processed_messages[0]}")
 
         return processed_messages
 
@@ -58,6 +83,8 @@ class KafkaMessageConsumer:
             while True:
                 # print("DEBUG: Polling...")
                 self.consume_batch(batch_size=100, timeout=1.0)
+                # Ensure the producer sends out re-queued messages efficiently
+                self.retry_producer.producer.poll(0)
         except KeyboardInterrupt:
             print("Consumer stopped by user.")
         except Exception as e:
@@ -65,6 +92,8 @@ class KafkaMessageConsumer:
         finally:
             print("Closing consumer connection.")
             self.consumer.close()
+            print("Flushing retry producer.")
+            self.retry_producer.close()
 
 
 def main():
