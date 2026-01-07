@@ -13,3 +13,10 @@ All notable changes to this project will be documented in this file.
 - Optimized Producer (asynchronous) and Consumer (batching).
 - Containerized application with multi-stage Dockerfile.
 - Scaled consumer to 3 replicas.
+- Upgraded Kafka infrastructure to Confluent Platform 8.0.0 (KRaft required).
+- Scaled to 24 partitions and 6 replicas for massive throughput.
+- Implemented Storage Persistence with Docker Volumes.
+- Optimized Producer/Consumer codebase:
+    - Added high-performance batching (32KB/20ms).
+    - Enabled Snappy compression.
+    - Reduced I/O overhead via throttled polling and streamlined logging.

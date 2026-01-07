@@ -1,8 +1,11 @@
 services:
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:8.0.3
+    container_name: kafka
     ports:
       - "9094:9094"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
       test: [ "CMD", "nc", "-z", "localhost", "29092" ]
       interval: 5s
@@ -19,8 +22,10 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT_INTERNAL'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CLUSTER_ID: 'MkU3OEVBNTcwNTJDRDRCMEY'
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 24
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
   producer:
@@ -36,12 +41,28 @@ services:
     build: .
     command: python -m src.consumer
     deploy:
-      replicas: 3
+      replicas: 6
     depends_on:
       kafka:
         condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+  init-kafka:
+    image: confluentinc/cp-kafka:8.0.3
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: |
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:29092 --list
+
+      echo 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic test-topic --replication-factor 1 --partitions 24
+
+      echo 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:29092 --list
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -52,3 +73,6 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+volumes:
+  kafka_data:

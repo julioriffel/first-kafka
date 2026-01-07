@@ -1,101 +1,108 @@
-# First Kafka Project
+# Kafka High-Performance Micro-Infrastructure
 
-A sample Python-based Kafka producer and consumer implementation using `confluent-kafka`, Pydantic Settings, and Docker. This project demonstrates high-performance asynchronous message production and efficient batch consumption.
+A robust, performant Kafka producer-consumer application leveraging **Confluent Platform 8.0.3 (Apache Kafka 4.0)** in **KRaft mode**. This project is designed for massive horizontal scaling with automated partition management and persistent storage.
 
-## Features
+## ✨ Key Features
 
-- **Asynchronous Producer**: Implements non-blocking message production with delivery reports.
-- **Batch Consumer**: Efficiently consumes messages in batches to reduce network overhead.
-- **Micro-Infrastructure**: Includes Docker Compose configuration for Kafka (KRaft mode) and Kafka UI.
-- **Containerized**: Fully dockerized with a multi-stage `Dockerfile` using `uv`.
-- **TDD Approach**: Unit tests with `pytest` and code quality with `ruff`.
+- **Kafka 8.0.3 (KRaft)**: Modern Zookeeper-less architecture.
+- **Massive Scaling**: Configured with **24 partitions** and **6 consumer replicas** for ultra-high throughput.
+- **High Performance**: 
+  - **Producer**: Snappy compression, `linger.ms=20`, and throttled polling ($1:100$).
+  - **Consumer**: Optimized batch fetching ($100$ messages/batch) and tuned network parameters.
+- **Persistence**: Full data persistence across restarts via Docker volumes.
+- **Auto-Initialization**: Dedicated `init-kafka` service for idempotent topic creation and configuration.
 
-## Project Structure
+---
+
+## 🏗️ Project Structure
 
 ```text
 first-kafka/
 ├── src/
-│   ├── config.py       # Configuration management using Pydantic Settings
-│   ├── producer.py     # Optimized Kafka Producer
-│   └── consumer.py     # Optimized Batch Kafka Consumer
-├── tests/
-│   ├── test_producer.py
-│   └── test_consumer.py
-├── docs/
-│   └── README.md       # Backup documentation
-├── docker-compose.yml  # Kafka infrastructure and app services
-├── Dockerfile          # Production-ready multi-stage build
-├── pyproject.toml      # Project dependencies and tool configuration
-├── uv.lock             # Dependency lockfile
-└── changelog.md        # History of changes
+│   ├── producer.py     # Optimized async producer
+│   ├── consumer.py     # Scalable batch consumer
+│   └── config.py       # Pydantic-based configuration
+├── tests/              # Pytest suite
+├── docs/               # Technical documentation
+├── Dockerfile          # Multi-stage optimized image
+├── docker-compose.yml  # Full infrastructure (Kafka, UI, App)
+└── pyproject.toml      # UV-managed dependencies
 ```
 
-## Installation
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv)
-- Docker & Docker Compose
 
-### Local Setup
-1. Clone the repository and navigate to the directory.
-2. Install dependencies:
+- [Docker & Docker Compose](https://docs.docker.com/get-docker/)
+- [uv](https://github.com/astral-sh/uv) (for local development)
+- Python 3.12+
+
+### 🐳 Running with Docker (Recommended)
+
+Start the entire stack (Kafka, 6 Consumers, Producer, and Kafka UI):
+
+```bash
+docker compose up -d --build --scale consumer=6
+```
+
+- **Kafka UI**: [http://localhost:8080](http://localhost:8080)
+- **External Kafka**: `localhost:9094`
+
+### 💻 Local Development
+
+1. **Install Dependencies**:
    ```bash
    uv sync
    ```
 
-## Infrastructure
+2. **Run Consumer**:
+   ```bash
+   uv run python -m src.consumer
+   ```
 
-The project uses port `9094` for external Kafka access (to avoid conflicts with default `9092`).
+3. **Run Producer (Performance Test)**:
+   ```bash
+   uv run python -m src.producer
+   ```
 
-### Start Infrastructure
+---
+
+## 📊 Infrastructure Details
+
+### Network & Port Mapping
+- **External Port**: `9094` (to avoid host conflicts with default 9092).
+- **Internal Port**: `29092`.
+
+### Scaling Strategy
+The topic `test-topic` is initialized with **24 partitions**. 
+- With 6 replicas, each consumer handles **4 partitions**.
+- The cluster can scale up to **24 replicas** without reconfiguring Kafka.
+
+### Data Persistence
+Kafka data is stored in the `kafka_data` volume. To wipe all data and start fresh:
 ```bash
-docker compose up -d
-```
-- **Kafka UI**: [http://localhost:8080](http://localhost:8080)
-- **Kafka Broker**: `localhost:9094`
-
-## Usage
-
-### Using Docker (Recommended)
-You can run the entire stack (Kafka KRaft + Producer + Consumer) automatically:
-```bash
-docker compose up -d
-```
-
-### Scaling Consumers
-By default, the consumer runs with 3 replicas. You can scale it further using:
-```bash
-docker compose up -d --scale consumer=5
-```
-
-To view consumer logs:
-```bash
-docker compose logs -f consumer
-```
-
-### Running Locally
-First, ensure the Docker infrastructure is running (for the broker).
-
-**Run Producer:**
-```bash
-uv run python -m src.producer
+docker compose down -v
 ```
 
-**Run Consumer:**
-```bash
-uv run python -m src.consumer
-```
+---
 
-## Development
+## 🛠️ Performance Tuning
 
-### Running Tests
-```bash
-uv run pytest
-```
+| Component | Optimization | Value |
+| :--- | :--- | :--- |
+| **Producer** | `linger.ms` | `20` |
+| **Producer** | `compression` | `snappy` |
+| **Producer** | `batch.size` | `32KB` |
+| **Consumer** | `batch_size` | `100` |
+| **Consumer** | `fetch.min.bytes`| `16KB` |
+| **Consumer** | `fetch.wait.max.ms` | `500` |
 
-### Linting & Formatting
-```bash
-uv run ruff check --fix .
-uv run ruff format .
-```
+---
+
+## 📝 Maintenance
+
+- **View Logs**: `docker compose logs -f consumer`
+- **Check Partitions**: `docker exec kafka kafka-topics --describe --topic test-topic --bootstrap-server localhost:29092`
+- **Clean Up**: `docker compose down`

@@ -12,60 +12,38 @@ class KafkaMessageConsumer:
                 "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
                 "group.id": settings.KAFKA_GROUP_ID,
                 "auto.offset.reset": "earliest",
+                "fetch.min.bytes": 1024 * 16, # Wait for 16KB of data
+                "fetch.wait.max.ms": 500,     # Or wait 500ms
             }
             self.consumer = Consumer(conf)
 
         self.consumer.subscribe([settings.KAFKA_TOPIC])
 
-    def consume_one(self, timeout=1.0):
-        """Polls for a single message and returns it as a dict."""
-        msg = self.consumer.poll(timeout)
-
-        if msg is None:
-            return None
-
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
-                # End of partition event
-                print(
-                    f"%% {msg.topic()} [{msg.partition()}] reached end at offset {msg.offset()}"
-                )
-            else:
-                print(f"Consumer error: {msg.error()}")
-            return None
-
-        try:
-            data = json.loads(msg.value().decode("utf-8"))
-            print(f"Received message: {data}")
-            return data
-        except Exception as e:
-            print(f"Error decoding message: {e}")
-            return None
-
-    def consume_batch(self, batch_size=10, timeout=1.0):
+    def consume_batch(self, batch_size=100, timeout=1.0):
         """Polls for a batch of messages and processes them."""
         msgs = self.consumer.consume(num_messages=batch_size, timeout=timeout)
+        if not msgs:
+            return []
 
         processed_messages = []
+        partitions_seen = set()
         for msg in msgs:
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
-                else:
-                    print(f"Consumer error: {msg.error()}")
-                    continue
+                print(f"Consumer error: {msg.error()}")
+                continue
 
             try:
-                data = json.loads(msg.value().decode("utf-8"))
-                processed_messages.append(data)
+                processed_messages.append(json.loads(msg.value().decode("utf-8")))
+                partitions_seen.add(msg.partition())
             except Exception as e:
                 print(f"Error decoding message: {e}")
 
         if processed_messages:
-            # Print a summary of the batch for tracking
-            print(f"[{settings.KAFKA_GROUP_ID}] Processed batch of {len(processed_messages)} messages.")
-            if len(processed_messages) > 0:
-                print(f"  Sample: {processed_messages[0]}")
+            p_ids = ", ".join(map(str, sorted(partitions_seen)))
+            print(f"[{settings.KAFKA_GROUP_ID}] Processed {len(processed_messages)} msgs from partition(s): {p_ids}")
+            print(f"  Sample: {processed_messages[0]}")
 
         return processed_messages
 
@@ -76,7 +54,7 @@ class KafkaMessageConsumer:
         try:
             while True:
                 # print("DEBUG: Polling...")
-                self.consume_batch(batch_size=10, timeout=1.0)
+                self.consume_batch(batch_size=100, timeout=1.0)
         except KeyboardInterrupt:
             print("Consumer stopped by user.")
         except Exception as e:
