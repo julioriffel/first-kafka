@@ -59,13 +59,34 @@ docker compose up -d --build --scale consumer=6
 
 2. **Run Consumer**:
    ```bash
-   uv run python -m src.consumer
+   uv run task consumer
    ```
 
 3. **Run Producer (Performance Test)**:
    ```bash
-   uv run python -m src.producer
+   uv run task producer
    ```
+
+---
+
+## ⚡ Quick Shortcuts
+
+Managed via `taskipy` and `uv`. Run these from the project root:
+
+- **Infrastructure**:
+  - `uv run task up`: Start Docker stack (Kafka, UI, etc.)
+  - `uv run task down`: Stop Docker stack
+  - `uv run task build`: Rebuild the application Docker image
+  - `uv run task logs`: Tail logs from the consumer containers
+  - `uv run task pre-commit`: Install the git pre-commit hooks
+  - `uv run task check`: Manually run all pre-commit hooks on the codebase
+- **Application**:
+  - `uv run task producer`: Start the local producer performance test
+  - `uv run task consumer`: Start a local batch consumer
+- **Quality Assurance**:
+  - `uv run task test`: Run the full test suite
+  - `uv run task lint`: Run ruff linting
+  - `uv run task format`: Run ruff formatting
 
 ---
 

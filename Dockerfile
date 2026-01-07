@@ -1,5 +1,5 @@
 # Build stage
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+FROM astral/uv:python3.12-trixie-slim AS builder
 
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONUNBUFFERED=1
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # Final stage
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-trixie
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app

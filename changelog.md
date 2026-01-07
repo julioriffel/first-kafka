@@ -20,3 +20,5 @@ All notable changes to this project will be documented in this file.
     - Added high-performance batching (32KB/20ms).
     - Enabled Snappy compression.
     - Reduced I/O overhead via throttled polling and streamlined logging.
+- Added project shortcuts via `uv` and `taskipy` for producer, consumer, and infrastructure management.
+- Configured `pre-commit` with `ruff` and `pytest` integration.
