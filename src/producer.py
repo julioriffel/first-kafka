@@ -34,7 +34,7 @@ class KafkaMessageProducer:
 if __name__ == "__main__":
     try:
         producer = KafkaMessageProducer()
-        for a in range(1000):
+        for a in range(10000):
             test_message = {"hello": "world", "status": f"producer test {a}"}
             producer.send_message(settings.KAFKA_TOPIC, test_message)
     finally:

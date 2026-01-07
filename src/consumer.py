@@ -62,19 +62,27 @@ class KafkaMessageConsumer:
                 print(f"Error decoding message: {e}")
 
         if processed_messages:
-            print(f"Processed batch of {len(processed_messages)} messages.")
+            # Print a summary of the batch for tracking
+            print(f"[{settings.KAFKA_GROUP_ID}] Processed batch of {len(processed_messages)} messages.")
+            if len(processed_messages) > 0:
+                print(f"  Sample: {processed_messages[0]}")
 
         return processed_messages
 
     def start_consuming(self):
         """Continuous loop to consume messages efficiently using batches."""
         print(f"Starting consumer for topic: {settings.KAFKA_TOPIC}")
+        print(f"Connecting to: {settings.KAFKA_BOOTSTRAP_SERVERS}")
         try:
             while True:
-                self.consume_batch(batch_size=100, timeout=1.0)
+                # print("DEBUG: Polling...")
+                self.consume_batch(batch_size=10, timeout=1.0)
         except KeyboardInterrupt:
-            pass
+            print("Consumer stopped by user.")
+        except Exception as e:
+            print(f"Consumer error: {e}")
         finally:
+            print("Closing consumer connection.")
             self.consumer.close()
 
 

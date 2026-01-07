@@ -6,7 +6,7 @@ A sample Python-based Kafka producer and consumer implementation using `confluen
 
 - **Asynchronous Producer**: Implements non-blocking message production with delivery reports.
 - **Batch Consumer**: Efficiently consumes messages in batches to reduce network overhead.
-- **Micro-Infrastructure**: Includes Docker Compose configuration for Kafka, Zookeeper, and Kafka UI.
+- **Micro-Infrastructure**: Includes Docker Compose configuration for Kafka (KRaft mode) and Kafka UI.
 - **Containerized**: Fully dockerized with a multi-stage `Dockerfile` using `uv`.
 - **TDD Approach**: Unit tests with `pytest` and code quality with `ruff`.
 
@@ -58,7 +58,7 @@ docker compose up -d
 ## Usage
 
 ### Using Docker (Recommended)
-You can run the entire stack (Kafka + Producer + Consumer) automatically:
+You can run the entire stack (Kafka KRaft + Producer + Consumer) automatically:
 ```bash
 docker compose up -d
 ```
